@@ -35,8 +35,15 @@ public class OrderCreatedEventConsumer {
                 topic, partition, offset);
 
         try {
+            // Strip surrounding quotes if double-serialized
+            // "\"{ json }\"" → "{ json }"
+            String cleanMessage = message;
+            if (message.startsWith("\"") && message.endsWith("\"")) {
+                cleanMessage = objectMapper.readValue(message, String.class);
+            }
+
             OrderCreatedEvent event = objectMapper.readValue(
-                    message, OrderCreatedEvent.class);
+                    cleanMessage, OrderCreatedEvent.class);
 
             log.info("Deserialised event: orderId={} partnerId={} correlationId={}",
                     event.getOrderId(), event.getPartnerId(), event.getCorrelationId());
@@ -44,11 +51,9 @@ public class OrderCreatedEventConsumer {
             fulfilmentService.processOrder(event);
 
         } catch (JsonProcessingException e) {
-            // Bad message — log and skip (don't throw, or Kafka will retry forever)
             log.error("Failed to deserialise Kafka message: {} error={}",
                     message, e.getMessage());
         } catch (Exception e) {
-            // Unexpected error — log and skip
             log.error("Failed to process order event: error={}", e.getMessage(), e);
         }
     }
