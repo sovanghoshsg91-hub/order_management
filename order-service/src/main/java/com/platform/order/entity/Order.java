@@ -1,19 +1,17 @@
 package com.platform.order.entity;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondaryPartitionKey;
 
 import java.time.Instant;
 
-@Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Getter
+@Setter
 @DynamoDbBean
 public class Order {
 
@@ -31,7 +29,7 @@ public class Order {
         return orderId;
     }
 
-    @DynamoDbSecondaryPartitionKey(indexNames = "partnerId-createdAt-index")
+    @DynamoDbSecondaryPartitionKey(indexNames = {"partnerId-index"})
     public String getPartnerId() {
         return partnerId;
     }

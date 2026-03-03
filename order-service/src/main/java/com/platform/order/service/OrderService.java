@@ -2,6 +2,7 @@ package com.platform.order.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.platform.order.dto.OrderListResponse;
 import com.platform.order.entity.IdempotencyKey;
 import com.platform.order.entity.Order;
 import com.platform.order.entity.OutboxEvent;
@@ -19,12 +20,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbIndex;
+import software.amazon.awssdk.enhanced.dynamodb.model.Page;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.security.MessageDigest;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -126,6 +131,43 @@ public class OrderService {
         log.info("Outbox event saved: eventId={}", outboxEvent.getEventId());
 
         return toResponse(order);
+    }
+
+    public OrderListResponse listOrders(String partnerId, int limit, String cursor) {
+        DynamoDbIndex<Order> index = orderRepository.getIndex(); // we'll add this
+
+        QueryEnhancedRequest.Builder queryBuilder = QueryEnhancedRequest.builder()
+                .queryConditional(
+                        QueryConditional.keyEqualTo(k -> k.partitionValue(partnerId))
+                )
+                .limit(limit);
+
+        if (cursor != null && !cursor.isBlank()) {
+            Map<String, AttributeValue> startKey = new HashMap<>();
+            startKey.put("partnerId", AttributeValue.builder().s(partnerId).build());
+            startKey.put("orderId", AttributeValue.builder().s(cursor).build());
+            queryBuilder.exclusiveStartKey(startKey);
+        }
+
+        Page<Order> firstPage = index.query(queryBuilder.build())
+                .iterator().next();
+
+        // nextCursor comes from DynamoDB's lastEvaluatedKey
+        String nextCursor = null;
+        if (firstPage.lastEvaluatedKey() != null) {
+            AttributeValue lastKey = firstPage.lastEvaluatedKey().get("orderId");
+            if (lastKey != null) nextCursor = lastKey.s();
+        }
+
+        List<OrderResponse> orders = firstPage.items()
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+
+        return OrderListResponse.builder()
+                .orders(orders)
+                .nextCursor(nextCursor)
+                .build();
     }
 
     public OrderResponse getOrder(String orderId, String partnerId) {

@@ -1,5 +1,6 @@
 package com.platform.order.controller;
 
+import com.platform.order.dto.OrderListResponse;
 import com.platform.order.service.OrderService;
 import com.platform.shared.dto.OrderRequest;
 import com.platform.shared.dto.OrderResponse;
@@ -53,6 +54,29 @@ public class OrderController {
                 partnerId, idempotencyKey, request);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping
+    @Operation(summary = "List orders with cursor-based pagination")
+    public ResponseEntity<?> listOrders(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader("X-Partner-Id") String partnerId,
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(required = false) String cursor) {
+
+        if (partnerId == null || partnerId.isBlank()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                    ErrorResponse.builder()
+                            .errorCode("PARTNER_ID_MISSING")
+                            .message("Your account is not linked to a partner profile.")
+                            .build()
+            );
+        }
+
+        log.info("Listing orders: partnerId={} limit={} cursor={}",
+                partnerId, limit, cursor);
+        OrderListResponse response = orderService.listOrders(partnerId, limit, cursor);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{orderId}")
