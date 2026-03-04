@@ -9,6 +9,8 @@ import com.platform.order.entity.OutboxEvent;
 import com.platform.order.repository.IdempotencyRepository;
 import com.platform.order.repository.OrderRepository;
 import com.platform.order.repository.OutboxRepository;
+import com.platform.shared.audit.AuditEventType;
+import com.platform.shared.audit.AuditService;
 import com.platform.shared.dto.OrderRequest;
 import com.platform.shared.dto.OrderResponse;
 import com.platform.shared.event.OrderCreatedEvent;
@@ -41,7 +43,7 @@ public class OrderService {
     private final OutboxRepository outboxRepository;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
-
+    private final AuditService auditService;
     private static final String PARTNER_STATUS_KEY = "partner:%s:status";
 
     public OrderResponse createOrder(String partnerId,
@@ -50,7 +52,17 @@ public class OrderService {
         String correlationId = MDC.get("correlationId");
 
         // Step 1: Kill switch check
-        checkPartnerNotRevoked(partnerId);
+        try {
+            checkPartnerNotRevoked(partnerId);
+        } catch (PartnerRevokedException e) {
+            // Audit: blocked request — no PII ✅
+            auditService.failure(
+                    AuditEventType.PARTNER_REVOKED_BLOCKED,
+                    "ORDER", null,
+                    partnerId, correlationId,
+                    "Partner is revoked");
+            throw e;
+        }
 
         // Step 2: Idempotency check
         String requestHash = computeHash(request);
@@ -60,18 +72,27 @@ public class OrderService {
         if (existingKey.isPresent()) {
             IdempotencyKey existing = existingKey.get();
 
-            // Same key + same payload = return original response (duplicate request)
             if (existing.getRequestHash().equals(requestHash)) {
-                log.info("Duplicate request detected, returning original response. " +
-                        "orderId={}", existing.getOrderId());
+                log.info("Duplicate request: orderId={}",
+                        existing.getOrderId());
+                // Audit: duplicate detected — no PII ✅
+                auditService.success(
+                        AuditEventType.ORDER_DUPLICATE,
+                        "ORDER", existing.getOrderId(),
+                        partnerId, correlationId,
+                        null, "CREATED");
                 return orderRepository.findById(existing.getOrderId())
                         .map(this::toResponse)
-                        .orElseThrow(() -> new OrderNotFoundException(existing.getOrderId()));
+                        .orElseThrow(() ->
+                                new OrderNotFoundException(existing.getOrderId()));
             }
 
-            // Same key + different payload = conflict!
-            log.warn("Idempotency conflict: same key, different payload. key={}",
-                    idempotencyKeyHeader);
+            // Audit: idempotency conflict — no PII ✅
+            auditService.failure(
+                    AuditEventType.IDEMPOTENCY_CONFLICT,
+                    "ORDER", null,
+                    partnerId, correlationId,
+                    "Idempotency key reused with different payload");
             throw new IdempotencyConflictException(idempotencyKeyHeader);
         }
 
@@ -84,30 +105,26 @@ public class OrderService {
                 .partnerId(partnerId)
                 .status("CREATED")
                 .orderType(request.getOrderType())
-                .payload(toJson(request.getPayload()))
+                .payload(request.getPayload().toString())
                 .correlationId(correlationId)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
 
         orderRepository.save(order);
-        log.info("Order created: orderId={} partnerId={}", orderId, partnerId);
 
-        // Step 4: Save idempotency key (TTL 24h)
+        // Step 4: Save idempotency key
         IdempotencyKey idempotencyKey = IdempotencyKey.builder()
                 .partnerId(partnerId)
                 .idempotencyKey(idempotencyKeyHeader)
                 .requestHash(requestHash)
                 .orderId(orderId)
                 .createdAt(now)
-                .expiresAt(now.getEpochSecond() + 86400) // 24 hours TTL
+                .expiresAt(now.getEpochSecond() + 86400)
                 .build();
-
         idempotencyRepository.save(idempotencyKey);
-        log.info("Idempotency key saved: key={}", idempotencyKeyHeader);
 
-        // Step 5: Save outbox event (status=PENDING)
-        // Poller picks this up and publishes to Kafka
+        // Step 5: Save outbox event
         OrderCreatedEvent event = OrderCreatedEvent.builder()
                 .eventId(UUID.randomUUID().toString())
                 .orderId(orderId)
@@ -126,36 +143,49 @@ public class OrderService {
                 .correlationId(correlationId)
                 .createdAt(now)
                 .build();
-
         outboxRepository.save(outboxEvent);
-        log.info("Outbox event saved: eventId={}", outboxEvent.getEventId());
 
+        // Audit: order created — resourceId only, no PII ✅
+        auditService.success(
+                AuditEventType.ORDER_CREATED,
+                "ORDER", orderId,
+                partnerId, correlationId,
+                null, "CREATED");
+
+        log.info("Order created: orderId={}", orderId);
         return toResponse(order);
     }
 
-    public OrderListResponse listOrders(String partnerId, int limit, String cursor) {
-        DynamoDbIndex<Order> index = orderRepository.getIndex(); // we'll add this
+    public OrderListResponse listOrders(String partnerId,
+                                        int limit,
+                                        String cursor) {
+        String correlationId = MDC.get("correlationId");
 
-        QueryEnhancedRequest.Builder queryBuilder = QueryEnhancedRequest.builder()
-                .queryConditional(
-                        QueryConditional.keyEqualTo(k -> k.partitionValue(partnerId))
-                )
-                .limit(limit);
+        DynamoDbIndex<Order> index = orderRepository.getIndex();
+
+        QueryEnhancedRequest.Builder queryBuilder =
+                QueryEnhancedRequest.builder()
+                        .queryConditional(
+                                QueryConditional.keyEqualTo(
+                                        k -> k.partitionValue(partnerId)))
+                        .limit(limit);
 
         if (cursor != null && !cursor.isBlank()) {
             Map<String, AttributeValue> startKey = new HashMap<>();
-            startKey.put("partnerId", AttributeValue.builder().s(partnerId).build());
-            startKey.put("orderId", AttributeValue.builder().s(cursor).build());
+            startKey.put("partnerId",
+                    AttributeValue.builder().s(partnerId).build());
+            startKey.put("orderId",
+                    AttributeValue.builder().s(cursor).build());
             queryBuilder.exclusiveStartKey(startKey);
         }
 
         Page<Order> firstPage = index.query(queryBuilder.build())
                 .iterator().next();
 
-        // nextCursor comes from DynamoDB's lastEvaluatedKey
         String nextCursor = null;
         if (firstPage.lastEvaluatedKey() != null) {
-            AttributeValue lastKey = firstPage.lastEvaluatedKey().get("orderId");
+            AttributeValue lastKey =
+                    firstPage.lastEvaluatedKey().get("orderId");
             if (lastKey != null) nextCursor = lastKey.s();
         }
 
@@ -163,6 +193,16 @@ public class OrderService {
                 .stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+
+        // Audit: orders listed — resourceId=partnerId, no PII ✅
+        auditService.success(
+                AuditEventType.ORDER_ACCESSED,
+                "ORDER_LIST", partnerId,
+                partnerId, correlationId,
+                null, "LISTED:" + orders.size());
+
+        log.info("Orders listed: partnerId={} count={} cursor={}",
+                partnerId, orders.size(), cursor);
 
         return OrderListResponse.builder()
                 .orders(orders)
@@ -173,6 +213,14 @@ public class OrderService {
     public OrderResponse getOrder(String orderId, String partnerId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        // Audit: order accessed — no PII ✅
+        auditService.success(
+                AuditEventType.ORDER_ACCESSED,
+                "ORDER", orderId,
+                partnerId, MDC.get("correlationId"),
+                null, order.getStatus());
+
         return toResponse(order);
     }
 
