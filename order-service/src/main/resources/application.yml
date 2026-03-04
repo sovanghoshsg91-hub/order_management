@@ -1,5 +1,5 @@
 server:
-  port: 8082
+  port: ${SERVER_PORT:8082}
 
 spring:
   application:
@@ -44,4 +44,4 @@ springdoc:
 
 logging:
   pattern:
-    console: '{"timestamp":"%d{yyyy-MM-dd HH:mm:ss}","level":"%p","service":"order-service","correlationId":"%X{correlationId}","path":"%X{path}","message":"%m"}%n'
+    console: '{"timestamp":"%d{yyyy-MM-dd HH:mm:ss}","level":"%p","service":"order-service","instance":"${SERVER_PORT:8082}","correlationId":"%X{correlationId}","message":"%m"}%n'

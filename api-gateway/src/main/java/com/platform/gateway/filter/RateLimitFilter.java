@@ -23,7 +23,7 @@ public class RateLimitFilter implements GatewayFilter {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
 
-    private static final int RATE_LIMIT_PER_SECOND = 5;
+    private static final int RATE_LIMIT_PER_SECOND = 100;
     private static final int DAILY_QUOTA = 1000;
 
     private final ReactiveStringRedisTemplate redisTemplate;

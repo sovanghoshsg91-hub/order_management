@@ -31,13 +31,25 @@ public class GatewayConfig {
                                 .filter(rateLimitFilter))
                         .uri("http://localhost:8081"))
 
-                // order-service routes — PARTNER only
-                .route("order-service", r -> r
+                // order-service instance 1 — 50% traffic
+                .route("order-service-1", r -> r
                         .path("/orders/**")
+                        .and()
+                        .weight("order-group", 50)
                         .filters(f -> f
                                 .filter(correlationIdFilter)
                                 .filter(rateLimitFilter))
                         .uri("http://localhost:8082"))
+
+                // order-service instance 2 — 50% traffic
+                .route("order-service-2", r -> r
+                        .path("/orders/**")
+                        .and()
+                        .weight("order-group", 50)
+                        .filters(f -> f
+                                .filter(correlationIdFilter)
+                                .filter(rateLimitFilter))
+                        .uri("http://localhost:8084"))
 
                 .build();
     }

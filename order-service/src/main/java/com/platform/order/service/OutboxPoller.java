@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import software.amazon.awssdk.services.dynamodb.model.DynamoDbException;
 
 import java.time.Instant;
 import java.util.List;
@@ -50,6 +51,33 @@ public class OutboxPoller {
 
             } catch (Exception e) {
                 log.error("OutboxPoller error: eventId={}", event.getEventId(), e);
+            }
+        }
+    }
+
+    private void markPublished(OutboxEvent event) {
+        try {
+            event.setStatus("PUBLISHED");
+            event.setPublishedAt(Instant.now());
+            // @DynamoDbVersionAttribute automatically adds:
+            // condition: version = currentVersion
+            // increment: version + 1
+            outboxRepository.update(event);
+            log.info("Event published: eventId={} topic={}",
+                    event.getEventId(), event.getEventType());
+
+        } catch (DynamoDbException e) {
+            if (e.getMessage() != null && e.getMessage()
+                    .contains("ConditionalCheckFailedException")) {
+                // Another poller instance already marked it
+                // published — safe to ignore ✅
+                log.info("Event {} already published by " +
+                                "another instance — skipping",
+                        event.getEventId());
+            } else {
+                log.error("Failed to mark event published: " +
+                                "eventId={} error={}",
+                        event.getEventId(), e.getMessage());
             }
         }
     }
