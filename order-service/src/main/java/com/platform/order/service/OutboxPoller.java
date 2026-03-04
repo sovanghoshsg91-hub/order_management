@@ -20,7 +20,6 @@ public class OutboxPoller {
     private final OutboxRepository outboxRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    // Runs every 500ms
     @Scheduled(fixedDelay = 500)
     public void pollAndPublish() {
         List<OutboxEvent> pendingEvents = outboxRepository.findPendingEvents(10);
@@ -29,28 +28,27 @@ public class OutboxPoller {
             return;
         }
 
-        log.info("OutboxPoller: found {} pending events", pendingEvents.size());
+        log.info("OutboxPoller: found {} pending events",
+                pendingEvents.size());
 
         for (OutboxEvent event : pendingEvents) {
             try {
-                // Publish to Kafka topic
-                kafkaTemplate.send(event.getEventType(), event.getPayload())
+                kafkaTemplate.send(event.getEventType(),
+                                event.getPayload())
                         .whenComplete((result, ex) -> {
                             if (ex != null) {
-                                log.error("Failed to publish event: eventId={} error={}",
-                                        event.getEventId(), ex.getMessage());
+                                log.error("Failed to publish: " +
+                                                "eventId={} error={}",
+                                        event.getEventId(),
+                                        ex.getMessage());
                             } else {
-                                // Mark as PUBLISHED only after Kafka confirms
-                                event.setStatus("PUBLISHED");
-                                event.setPublishedAt(Instant.now());
-                                outboxRepository.update(event);
-                                log.info("Event published: eventId={} topic={}",
-                                        event.getEventId(), event.getEventType());
+                                markPublished(event);
                             }
                         });
 
             } catch (Exception e) {
-                log.error("OutboxPoller error: eventId={}", event.getEventId(), e);
+                log.error("OutboxPoller error: eventId={}",
+                        event.getEventId(), e);
             }
         }
     }
