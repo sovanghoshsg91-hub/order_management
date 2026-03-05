@@ -1,0 +1,22 @@
+FROM maven:3.9.5-eclipse-temurin-17 AS build
+WORKDIR /workspace
+COPY pom.xml .
+COPY shared-lib/pom.xml shared-lib/
+COPY api-gateway/pom.xml api-gateway/
+COPY partner-service/pom.xml partner-service/
+COPY order-service/pom.xml order-service/
+COPY fulfilment-service/pom.xml fulfilment-service/
+RUN mvn dependency:go-offline -pl shared-lib,fulfilment-service -am -q
+COPY shared-lib/src shared-lib/src
+COPY fulfilment-service/src fulfilment-service/src
+RUN mvn clean package -pl shared-lib,fulfilment-service -am -DskipTests
+RUN ls -la /workspace/fulfilment-service/target/
+RUN find /workspace/fulfilment-service/target -name "*.jar"
+
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+COPY --from=build /workspace/fulfilment-service/target/fulfilment-service-1.0.0-SNAPSHOT.jar app.jar
+EXPOSE 8083
+ENTRYPOINT ["java","-XX:+UseContainerSupport","-XX:MaxRAMPercentage=75.0","-jar","app.jar"]

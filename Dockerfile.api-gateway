@@ -1,0 +1,21 @@
+FROM maven:3.9.5-eclipse-temurin-17 AS build
+WORKDIR /workspace
+COPY pom.xml .
+COPY shared-lib/pom.xml shared-lib/
+COPY api-gateway/pom.xml api-gateway/
+COPY partner-service/pom.xml partner-service/
+COPY order-service/pom.xml order-service/
+COPY fulfilment-service/pom.xml fulfilment-service/
+RUN mvn dependency:go-offline -pl shared-lib,api-gateway -am -q
+COPY shared-lib/src shared-lib/src
+COPY api-gateway/src api-gateway/src
+RUN mvn clean package -pl shared-lib,api-gateway -am -DskipTests -q
+RUN cp /workspace/api-gateway/target/api-gateway-*.jar /workspace/api-gateway/target/app.jar
+
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+COPY --from=build /workspace/api-gateway/target/app.jar app.jar
+EXPOSE 8090
+ENTRYPOINT ["java","-XX:+UseContainerSupport","-XX:MaxRAMPercentage=75.0","-jar","app.jar"]

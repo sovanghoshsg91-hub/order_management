@@ -214,7 +214,13 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
-        // Audit: order accessed — no PII ✅
+        // Security: ensure partner can only access their own orders
+        if (!order.getPartnerId().equals(partnerId)) {
+            log.warn("Partner {} attempted to access order {} owned by {}",
+                    partnerId, orderId, order.getPartnerId());
+            throw new OrderNotFoundException(orderId); // don't reveal it exists
+        }
+
         auditService.success(
                 AuditEventType.ORDER_ACCESSED,
                 "ORDER", orderId,

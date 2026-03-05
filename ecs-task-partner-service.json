@@ -1,0 +1,35 @@
+{
+  "family": "partner-service",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::859328854484:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::859328854484:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "partner-service",
+      "image": "859328854484.dkr.ecr.ap-south-1.amazonaws.com/partner-orders/partner-service:latest",
+      "portMappings": [
+        { "containerPort": 8081, "protocol": "tcp" }
+      ],
+      "environment": [
+        { "name": "COGNITO_JWKS_URL",        "value": "https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_ZfrPfnBbf/.well-known/jwks.json" },
+        { "name": "REDIS_HOST",              "value": "redis.partner-orders.local" },
+        { "name": "REDIS_PORT",              "value": "6379" },
+        { "name": "KAFKA_BOOTSTRAP_SERVER",  "value": "pkc-l7pr2.ap-south-1.aws.confluent.cloud:9092" },
+        { "name": "KAFKA_API_KEY",           "value": "IBAUH3VLHJIHQNX3" },
+        { "name": "KAFKA_API_SECRET",        "value": "cfltORnr4yrZTRnTbOafyX9cBncFMpdmug4JVHHgUgaShuqK+6XrRdPCeiU4yiYw" },
+        { "name": "AWS_REGION",              "value": "ap-south-1" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group":         "/ecs/partner-service",
+          "awslogs-region":        "ap-south-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

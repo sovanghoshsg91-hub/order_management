@@ -1,0 +1,28 @@
+{
+  "family": "redis",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::859328854484:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::859328854484:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "redis",
+      "image": "redis:7-alpine",
+      "portMappings": [
+        { "containerPort": 6379, "protocol": "tcp" }
+      ],
+      "command": ["redis-server", "--maxmemory", "256mb",
+                  "--maxmemory-policy", "allkeys-lru"],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group":         "/ecs/redis",
+          "awslogs-region":        "ap-south-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

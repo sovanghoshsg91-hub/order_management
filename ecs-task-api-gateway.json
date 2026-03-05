@@ -1,0 +1,33 @@
+{
+  "family": "api-gateway",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::859328854484:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::859328854484:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "api-gateway",
+      "image": "859328854484.dkr.ecr.ap-south-1.amazonaws.com/partner-orders/api-gateway:latest",
+      "portMappings": [
+        { "containerPort": 8090, "protocol": "tcp" }
+      ],
+      "environment": [
+        { "name": "COGNITO_JWKS_URL",   "value": "https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_ZfrPfnBbf/.well-known/jwks.json" },
+        { "name": "REDIS_PORT",         "value": "6379" },
+        { "name": "REDIS_HOST",          "value": "redis.partner-orders.local" },
+        { "name": "PARTNER_SERVICE_URL", "value": "http://partner-service.partner-orders.local:8081" },
+        { "name": "ORDER_SERVICE_URL",   "value": "http://order-service.partner-orders.local:8082" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group":         "/ecs/api-gateway",
+          "awslogs-region":        "ap-south-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+FROM maven:3.9.5-eclipse-temurin-17 AS build
+WORKDIR /workspace
+COPY pom.xml .
+COPY shared-lib/pom.xml shared-lib/
+COPY api-gateway/pom.xml api-gateway/
+COPY partner-service/pom.xml partner-service/
+COPY order-service/pom.xml order-service/
+COPY fulfilment-service/pom.xml fulfilment-service/
+RUN mvn dependency:go-offline -pl shared-lib,partner-service -am -q
+COPY shared-lib/src shared-lib/src
+COPY partner-service/src partner-service/src
+RUN mvn clean package -pl shared-lib,partner-service -am -DskipTests -q
+RUN cp /workspace/partner-service/target/partner-service-*.jar /workspace/partner-service/target/app.jar
+
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+COPY --from=build /workspace/partner-service/target/app.jar app.jar
+EXPOSE 8081
+ENTRYPOINT ["java","-XX:+UseContainerSupport","-XX:MaxRAMPercentage=75.0","-jar","app.jar"]

@@ -1,9 +1,6 @@
 server:
   port: 8090
 
-app:
-  version: 1.0.0-local
-
 spring:
   application:
     name: api-gateway
@@ -18,6 +15,15 @@ spring:
       resourceserver:
         jwt:
           jwk-set-uri: ${COGNITO_JWKS_URL}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
 
 logging:
   level:

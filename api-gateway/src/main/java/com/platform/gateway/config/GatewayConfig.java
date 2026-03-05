@@ -2,6 +2,7 @@ package com.platform.gateway.config;
 
 import com.platform.gateway.filter.CorrelationIdFilter;
 import com.platform.gateway.filter.RateLimitFilter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
@@ -13,6 +14,12 @@ public class GatewayConfig {
     private final CorrelationIdFilter correlationIdFilter;
     private final RateLimitFilter rateLimitFilter;
 
+    @Value("${PARTNER_SERVICE_URL:http://localhost:8081}")
+    private String partnerServiceUrl;
+
+    @Value("${ORDER_SERVICE_URL:http://localhost:8082}")
+    private String orderServiceUrl;
+
     public GatewayConfig(CorrelationIdFilter correlationIdFilter,
                          RateLimitFilter rateLimitFilter) {
         this.correlationIdFilter = correlationIdFilter;
@@ -23,33 +30,21 @@ public class GatewayConfig {
     public RouteLocator routeLocator(RouteLocatorBuilder builder) {
         return builder.routes()
 
-                // partner-service routes — ADMIN only
+                // partner-service routes
                 .route("partner-service", r -> r
                         .path("/partners/**")
                         .filters(f -> f
                                 .filter(correlationIdFilter)
                                 .filter(rateLimitFilter))
-                        .uri("http://localhost:8081"))
+                        .uri(partnerServiceUrl))
 
-                // order-service instance 1 — 50% traffic
+                // order-service — single instance in ECS
                 .route("order-service-1", r -> r
                         .path("/orders/**")
-                        .and()
-                        .weight("order-group", 50)
                         .filters(f -> f
                                 .filter(correlationIdFilter)
                                 .filter(rateLimitFilter))
-                        .uri("http://localhost:8082"))
-
-                // order-service instance 2 — 50% traffic
-                .route("order-service-2", r -> r
-                        .path("/orders/**")
-                        .and()
-                        .weight("order-group", 50)
-                        .filters(f -> f
-                                .filter(correlationIdFilter)
-                                .filter(rateLimitFilter))
-                        .uri("http://localhost:8084"))
+                        .uri(orderServiceUrl))
 
                 .build();
     }
