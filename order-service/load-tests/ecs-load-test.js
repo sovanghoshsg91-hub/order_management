@@ -41,6 +41,7 @@ export default function () {
     const headers = {
         'Content-Type':  'application/json',
         'Authorization': `Bearer ${PARTNER_TOKEN}`,
+        'Idempotency-Key': `k6-${__VU}-${__ITER}`,
     };
 
     // POST /orders — routed to one of 2 order-service instances
