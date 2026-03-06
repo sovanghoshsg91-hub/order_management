@@ -19,6 +19,7 @@ spring:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+    config-url: /v3/api-docs/swagger-config
     urls:
       - name: partner-service
         url: /partner-service/v3/api-docs

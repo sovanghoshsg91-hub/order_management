@@ -66,6 +66,10 @@ public class GatewayConfig {
                         .filters(f -> f.stripPrefix(1))
                         .uri(fulfilmentServiceUrl))
 
+                .route("swagger-ui-webjars", r -> r
+                        .path("/webjars/**")
+                        .uri("http://localhost:8090"))
+
                 .build();
     }
 }
