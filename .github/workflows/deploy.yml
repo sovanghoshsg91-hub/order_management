@@ -30,18 +30,21 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # One-command build (no test classes yet — skipped safely) ✅
+      # One-command build ✅
       - name: Build
         run: mvn clean package -DskipTests --batch-mode --no-transfer-progress
 
-      # Static analysis — full plugin coordinates ✅
+      # Static analysis ✅
       - name: SpotBugs Static Analysis
         run: mvn com.github.spotbugs:spotbugs-maven-plugin:4.8.2.0:check --batch-mode --no-transfer-progress
         continue-on-error: true
 
-      # Dependency scan ✅
+      # Dependency scan — requires NVD_API_KEY secret ✅
       - name: OWASP Dependency Check
-        run: mvn org.owasp:dependency-check-maven:9.0.6:check --batch-mode --no-transfer-progress
+        run: |
+          mvn org.owasp:dependency-check-maven:9.0.6:check \
+            -DnvdApiKey=${{ secrets.NVD_API_KEY }} \
+            --batch-mode --no-transfer-progress
         continue-on-error: true
 
       # Upload dependency check report
@@ -108,7 +111,6 @@ jobs:
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      # api-gateway ──────────────────────────────────────────────────────────
       - name: Build and Deploy api-gateway
         if: >
           needs.changes.outputs.api-gateway == 'true' ||
@@ -120,14 +122,9 @@ jobs:
             -t $ECR_BASE/partner-orders/api-gateway:${{ github.sha }} .
           docker push $ECR_BASE/partner-orders/api-gateway:latest
           docker push $ECR_BASE/partner-orders/api-gateway:${{ github.sha }}
-          aws ecs update-service \
-            --cluster $CLUSTER \
-            --service api-gateway \
-            --force-new-deployment \
-            --region $AWS_REGION
+          aws ecs update-service --cluster $CLUSTER --service api-gateway --force-new-deployment --region $AWS_REGION
           echo "api-gateway deployed: ${{ github.sha }}"
 
-      # partner-service ──────────────────────────────────────────────────────
       - name: Build and Deploy partner-service
         if: >
           needs.changes.outputs.partner-service == 'true' ||
@@ -138,14 +135,9 @@ jobs:
             -t $ECR_BASE/partner-orders/partner-service:${{ github.sha }} .
           docker push $ECR_BASE/partner-orders/partner-service:latest
           docker push $ECR_BASE/partner-orders/partner-service:${{ github.sha }}
-          aws ecs update-service \
-            --cluster $CLUSTER \
-            --service partner-service \
-            --force-new-deployment \
-            --region $AWS_REGION
+          aws ecs update-service --cluster $CLUSTER --service partner-service --force-new-deployment --region $AWS_REGION
           echo "partner-service deployed: ${{ github.sha }}"
 
-      # order-service ────────────────────────────────────────────────────────
       - name: Build and Deploy order-service
         if: >
           needs.changes.outputs.order-service == 'true' ||
@@ -156,14 +148,9 @@ jobs:
             -t $ECR_BASE/partner-orders/order-service:${{ github.sha }} .
           docker push $ECR_BASE/partner-orders/order-service:latest
           docker push $ECR_BASE/partner-orders/order-service:${{ github.sha }}
-          aws ecs update-service \
-            --cluster $CLUSTER \
-            --service order-service \
-            --force-new-deployment \
-            --region $AWS_REGION
+          aws ecs update-service --cluster $CLUSTER --service order-service --force-new-deployment --region $AWS_REGION
           echo "order-service deployed: ${{ github.sha }}"
 
-      # fulfilment-service ───────────────────────────────────────────────────
       - name: Build and Deploy fulfilment-service
         if: >
           needs.changes.outputs.fulfilment-service == 'true' ||
@@ -174,11 +161,7 @@ jobs:
             -t $ECR_BASE/partner-orders/fulfilment-service:${{ github.sha }} .
           docker push $ECR_BASE/partner-orders/fulfilment-service:latest
           docker push $ECR_BASE/partner-orders/fulfilment-service:${{ github.sha }}
-          aws ecs update-service \
-            --cluster $CLUSTER \
-            --service fulfilment-service \
-            --force-new-deployment \
-            --region $AWS_REGION
+          aws ecs update-service --cluster $CLUSTER --service fulfilment-service --force-new-deployment --region $AWS_REGION
           echo "fulfilment-service deployed: ${{ github.sha }}"
 
   # ── Job 3: Deploy to PROD (manual approval) ────────────────────────────────
@@ -208,11 +191,7 @@ jobs:
           needs.changes.outputs.api-gateway == 'true' ||
           needs.changes.outputs.shared-lib == 'true'
         run: |
-          aws ecs update-service \
-            --cluster $CLUSTER \
-            --service api-gateway \
-            --force-new-deployment \
-            --region $AWS_REGION
+          aws ecs update-service --cluster $CLUSTER --service api-gateway --force-new-deployment --region $AWS_REGION
           echo "api-gateway promoted to prod: ${{ github.sha }}"
 
       - name: Deploy partner-service to Prod
@@ -220,33 +199,21 @@ jobs:
           needs.changes.outputs.partner-service == 'true' ||
           needs.changes.outputs.shared-lib == 'true'
         run: |
-          aws ecs update-service \
-            --cluster $CLUSTER \
-            --service partner-service \
-            --force-new-deployment \
-            --region $AWS_REGION
+          aws ecs update-service --cluster $CLUSTER --service partner-service --force-new-deployment --region $AWS_REGION
 
       - name: Deploy order-service to Prod
         if: >
           needs.changes.outputs.order-service == 'true' ||
           needs.changes.outputs.shared-lib == 'true'
         run: |
-          aws ecs update-service \
-            --cluster $CLUSTER \
-            --service order-service \
-            --force-new-deployment \
-            --region $AWS_REGION
+          aws ecs update-service --cluster $CLUSTER --service order-service --force-new-deployment --region $AWS_REGION
 
       - name: Deploy fulfilment-service to Prod
         if: >
           needs.changes.outputs.fulfilment-service == 'true' ||
           needs.changes.outputs.shared-lib == 'true'
         run: |
-          aws ecs update-service \
-            --cluster $CLUSTER \
-            --service fulfilment-service \
-            --force-new-deployment \
-            --region $AWS_REGION
+          aws ecs update-service --cluster $CLUSTER --service fulfilment-service --force-new-deployment --region $AWS_REGION
 
       - name: Prod Deployment Summary
         run: |
