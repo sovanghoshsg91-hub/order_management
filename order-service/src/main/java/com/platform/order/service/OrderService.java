@@ -49,6 +49,9 @@ public class OrderService {
     public OrderResponse createOrder(String partnerId,
                                      String idempotencyKeyHeader,
                                      OrderRequest request) {
+        log.info("Creating order on instance: {}",
+                System.getenv("HOSTNAME") != null ? System.getenv("HOSTNAME") : "local");
+        
         String correlationId = MDC.get("correlationId");
 
         // Step 1: Kill switch check

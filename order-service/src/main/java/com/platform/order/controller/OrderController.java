@@ -11,11 +11,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -54,6 +57,18 @@ public class OrderController {
                 partnerId, idempotencyKey, request);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @Value("${app.version:1.0.0-local}")
+    private String appVersion;
+
+    @GetMapping("/orders/version")
+    public ResponseEntity<?> version() {
+        return ResponseEntity.ok(Map.of(
+                "version",  appVersion,
+                "instance", System.getenv().getOrDefault("HOSTNAME", "local"),
+                "service",  "order-service"
+        ));
     }
 
     @GetMapping
