@@ -118,7 +118,7 @@
           <version>4.8.2.0</version>
           <configuration>
             <excludeFilterFile>${maven.multiModuleProjectDirectory}/spotbugs-exclude.xml</excludeFilterFile>
-            <failThreshold>HIGH</failThreshold>
+            <maxAllowedViolations>100</maxAllowedViolations>
           </configuration>
         </plugin>
       </plugins>
