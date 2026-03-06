@@ -112,6 +112,15 @@
             </annotationProcessorPaths>
           </configuration>
         </plugin>
+        <plugin>
+          <groupId>com.github.spotbugs</groupId>
+          <artifactId>spotbugs-maven-plugin</artifactId>
+          <version>4.8.2.0</version>
+          <configuration>
+            <excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
+            <failThreshold>HIGH</failThreshold>
+          </configuration>
+        </plugin>
       </plugins>
     </pluginManagement>
   </build>
