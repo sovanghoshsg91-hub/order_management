@@ -42,6 +42,7 @@ export default function () {
         'Content-Type':  'application/json',
         'Authorization': `Bearer ${PARTNER_TOKEN}`,
         'Idempotency-Key': `k6-${__VU}-${__ITER}`,
+        'X-Partner-Id':    __ENV.PARTNER_ID
     };
 
     // POST /orders — routed to one of 2 order-service instances
