@@ -62,15 +62,6 @@ public class OrderController {
     @Value("${app.version:1.0.0-local}")
     private String appVersion;
 
-    @GetMapping("/orders/version")
-    public ResponseEntity<?> version() {
-        return ResponseEntity.ok(Map.of(
-                "version",  appVersion,
-                "instance", System.getenv().getOrDefault("HOSTNAME", "local"),
-                "service",  "order-service"
-        ));
-    }
-
     @GetMapping
     @Operation(summary = "List orders with cursor-based pagination")
     public ResponseEntity<?> listOrders(

@@ -59,6 +59,9 @@ export default function () {
         'response time < 3s':   (r) => r.timings.duration < 3000,
     });
 
+    if (res.status !== 201) {
+        console.log(`FAIL status=${res.status} body=${res.body.substring(0, 200)}`);
+    }
     if (!ok) {
         console.log(`FAIL [${res.status}] ${res.body}`);
     } else {
