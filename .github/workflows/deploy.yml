@@ -1,35 +1,190 @@
-ci:
-  name: Build, Test, Analyse
-  runs-on: ubuntu-latest
+name: CI/CD Pipeline
 
-  steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
-    - name: Set up Java 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        cache: maven
+env:
+  AWS_REGION:     ap-south-1
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  ECR_BASE:       ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
+  CLUSTER:        partner-orders-cluster
 
-    # Build + SpotBugs in one Maven invocation ✅
-    - name: Build and Static Analysis
-      run: mvn clean package com.github.spotbugs:spotbugs-maven-plugin:4.8.2.0:check -DskipTests --batch-mode --no-transfer-progress
+jobs:
 
-    # OWASP — runs but never blocks pipeline ✅
-    - name: OWASP Dependency Check
-      run: |
-        mvn org.owasp:dependency-check-maven:9.0.6:check \
-          -DnvdApiKey=${{ secrets.NVD_API_KEY }} \
-          -DfailBuildOnCVSS=11 \
-          --batch-mode --no-transfer-progress
-      continue-on-error: true
+  ci:
+    name: Build, Test, Analyse
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Upload Dependency Check Report
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: dependency-check-report
-        path: '**/target/dependency-check-report.html'
-        if-no-files-found: ignore
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build and Static Analysis
+        run: mvn clean package com.github.spotbugs:spotbugs-maven-plugin:4.8.2.0:check -DskipTests --batch-mode --no-transfer-progress
+
+      - name: OWASP Dependency Check
+        run: mvn org.owasp:dependency-check-maven:9.0.6:check -DnvdApiKey=${{ secrets.NVD_API_KEY }} -DfailBuildOnCVSS=11 --batch-mode --no-transfer-progress
+        continue-on-error: true
+
+      - name: Upload Dependency Check Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: '**/target/dependency-check-report.html'
+          if-no-files-found: ignore
+
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      api-gateway:        ${{ steps.filter.outputs.api-gateway }}
+      partner-service:    ${{ steps.filter.outputs.partner-service }}
+      order-service:      ${{ steps.filter.outputs.order-service }}
+      fulfilment-service: ${{ steps.filter.outputs.fulfilment-service }}
+      shared-lib:         ${{ steps.filter.outputs.shared-lib }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            api-gateway:
+              - 'api-gateway/**'
+              - 'Dockerfile.api-gateway'
+            partner-service:
+              - 'partner-service/**'
+              - 'Dockerfile.partner-service'
+            order-service:
+              - 'order-service/**'
+              - 'Dockerfile.order-service'
+            fulfilment-service:
+              - 'fulfilment-service/**'
+              - 'Dockerfile.fulfilment-service'
+            shared-lib:
+              - 'shared-lib/**'
+
+  deploy-dev:
+    name: Deploy to Dev
+    runs-on: ubuntu-latest
+    needs: changes
+    if: github.ref == 'refs/heads/main'
+    environment: dev
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ap-south-1
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Deploy api-gateway
+        if: needs.changes.outputs.api-gateway == 'true' || needs.changes.outputs.shared-lib == 'true'
+        run: |
+          docker build -f Dockerfile.api-gateway \
+            --build-arg APP_VERSION=${{ github.sha }} \
+            -t $ECR_BASE/partner-orders/api-gateway:latest \
+            -t $ECR_BASE/partner-orders/api-gateway:${{ github.sha }} .
+          docker push $ECR_BASE/partner-orders/api-gateway:latest
+          docker push $ECR_BASE/partner-orders/api-gateway:${{ github.sha }}
+          aws ecs update-service --cluster $CLUSTER --service api-gateway --force-new-deployment --region $AWS_REGION
+          echo "api-gateway deployed: ${{ github.sha }}"
+
+      - name: Build and Deploy partner-service
+        if: needs.changes.outputs.partner-service == 'true' || needs.changes.outputs.shared-lib == 'true'
+        run: |
+          docker build -f Dockerfile.partner-service \
+            -t $ECR_BASE/partner-orders/partner-service:latest \
+            -t $ECR_BASE/partner-orders/partner-service:${{ github.sha }} .
+          docker push $ECR_BASE/partner-orders/partner-service:latest
+          docker push $ECR_BASE/partner-orders/partner-service:${{ github.sha }}
+          aws ecs update-service --cluster $CLUSTER --service partner-service --force-new-deployment --region $AWS_REGION
+          echo "partner-service deployed: ${{ github.sha }}"
+
+      - name: Build and Deploy order-service
+        if: needs.changes.outputs.order-service == 'true' || needs.changes.outputs.shared-lib == 'true'
+        run: |
+          docker build -f Dockerfile.order-service \
+            -t $ECR_BASE/partner-orders/order-service:latest \
+            -t $ECR_BASE/partner-orders/order-service:${{ github.sha }} .
+          docker push $ECR_BASE/partner-orders/order-service:latest
+          docker push $ECR_BASE/partner-orders/order-service:${{ github.sha }}
+          aws ecs update-service --cluster $CLUSTER --service order-service --force-new-deployment --region $AWS_REGION
+          echo "order-service deployed: ${{ github.sha }}"
+
+      - name: Build and Deploy fulfilment-service
+        if: needs.changes.outputs.fulfilment-service == 'true' || needs.changes.outputs.shared-lib == 'true'
+        run: |
+          docker build -f Dockerfile.fulfilment-service \
+            -t $ECR_BASE/partner-orders/fulfilment-service:latest \
+            -t $ECR_BASE/partner-orders/fulfilment-service:${{ github.sha }} .
+          docker push $ECR_BASE/partner-orders/fulfilment-service:latest
+          docker push $ECR_BASE/partner-orders/fulfilment-service:${{ github.sha }}
+          aws ecs update-service --cluster $CLUSTER --service fulfilment-service --force-new-deployment --region $AWS_REGION
+          echo "fulfilment-service deployed: ${{ github.sha }}"
+
+  deploy-prod:
+    name: Deploy to Prod
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+    if: github.ref == 'refs/heads/main'
+    environment: prod
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ap-south-1
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Deploy api-gateway to Prod
+        if: needs.changes.outputs.api-gateway == 'true' || needs.changes.outputs.shared-lib == 'true'
+        run: |
+          aws ecs update-service --cluster $CLUSTER --service api-gateway --force-new-deployment --region $AWS_REGION
+          echo "api-gateway promoted to prod: ${{ github.sha }}"
+
+      - name: Deploy partner-service to Prod
+        if: needs.changes.outputs.partner-service == 'true' || needs.changes.outputs.shared-lib == 'true'
+        run: |
+          aws ecs update-service --cluster $CLUSTER --service partner-service --force-new-deployment --region $AWS_REGION
+
+      - name: Deploy order-service to Prod
+        if: needs.changes.outputs.order-service == 'true' || needs.changes.outputs.shared-lib == 'true'
+        run: |
+          aws ecs update-service --cluster $CLUSTER --service order-service --force-new-deployment --region $AWS_REGION
+
+      - name: Deploy fulfilment-service to Prod
+        if: needs.changes.outputs.fulfilment-service == 'true' || needs.changes.outputs.shared-lib == 'true'
+        run: |
+          aws ecs update-service --cluster $CLUSTER --service fulfilment-service --force-new-deployment --region $AWS_REGION
+
+      - name: Prod Deployment Summary
+        run: |
+          echo "========================================"
+          echo "PROD Deployment Complete!"
+          echo "Commit: ${{ github.sha }}"
+          echo "Approved by: ${{ github.actor }}"
+          echo "========================================"
