@@ -59,9 +59,6 @@ public class OrderController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @Value("${app.version:1.0.0-local}")
-    private String appVersion;
-
     @GetMapping
     @Operation(summary = "List orders with cursor-based pagination")
     public ResponseEntity<?> listOrders(

@@ -18,7 +18,8 @@
         { "name": "REDIS_PORT",         "value": "6379" },
         { "name": "REDIS_HOST",          "value": "redis.partner-orders.local" },
         { "name": "PARTNER_SERVICE_URL", "value": "http://partner-service.partner-orders.local:8081" },
-        { "name": "ORDER_SERVICE_URL",   "value": "http://order-service.partner-orders.local:8082" }
+        { "name": "ORDER_SERVICE_URL",   "value": "http://order-service.partner-orders.local:8082" },
+        { "name": "FULFILMENT_SERVICE_URL", "value": "http://fulfilment-service.partner-orders.local:8083" }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",

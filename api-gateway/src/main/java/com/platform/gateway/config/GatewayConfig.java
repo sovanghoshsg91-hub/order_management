@@ -20,6 +20,9 @@ public class GatewayConfig {
     @Value("${ORDER_SERVICE_URL:http://localhost:8082}")
     private String orderServiceUrl;
 
+    @Value("${FULFILMENT_SERVICE_URL:http://localhost:8083}")
+    private String fulfilmentServiceUrl;
+
     public GatewayConfig(CorrelationIdFilter correlationIdFilter,
                          RateLimitFilter rateLimitFilter) {
         this.correlationIdFilter = correlationIdFilter;
@@ -30,7 +33,8 @@ public class GatewayConfig {
     public RouteLocator routeLocator(RouteLocatorBuilder builder) {
         return builder.routes()
 
-                // partner-service routes
+                // ── Business routes ───────────────────────────────────────
+
                 .route("partner-service", r -> r
                         .path("/partners/**")
                         .filters(f -> f
@@ -38,13 +42,29 @@ public class GatewayConfig {
                                 .filter(rateLimitFilter))
                         .uri(partnerServiceUrl))
 
-                // order-service — single instance in ECS
-                .route("order-service-1", r -> r
+                .route("order-service", r -> r
                         .path("/orders/**")
                         .filters(f -> f
                                 .filter(correlationIdFilter)
                                 .filter(rateLimitFilter))
                         .uri(orderServiceUrl))
+
+                // ── Swagger API docs routes ────────────────────────────────
+
+                .route("partner-service-docs", r -> r
+                        .path("/partner-service/v3/api-docs/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri(partnerServiceUrl))
+
+                .route("order-service-docs", r -> r
+                        .path("/order-service/v3/api-docs/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri(orderServiceUrl))
+
+                .route("fulfilment-service-docs", r -> r
+                        .path("/fulfilment-service/v3/api-docs/**")
+                        .filters(f -> f.stripPrefix(1))
+                        .uri(fulfilmentServiceUrl))
 
                 .build();
     }

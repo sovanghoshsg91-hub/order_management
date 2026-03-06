@@ -21,7 +21,18 @@ public class SecurityConfig {
         http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
-                        .pathMatchers("/health", "/version").permitAll()  // ← add this
+                        // Public endpoints
+                        .pathMatchers(
+                                "/health",
+                                "/version",
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/webjars/**",
+                                "/v3/api-docs/**",
+                                "/partner-service/v3/api-docs/**",
+                                "/order-service/v3/api-docs/**",
+                                "/fulfilment-service/v3/api-docs/**"
+                        ).permitAll()
                         .anyExchange().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
