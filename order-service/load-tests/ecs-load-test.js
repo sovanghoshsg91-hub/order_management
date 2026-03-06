@@ -52,10 +52,10 @@ export default function () {
 
     // Track metrics
     responseTime.add(res.timings.duration);
-    successRate.add(res.status === 201 || res.status === 200);
+    successRate.add(res.status === 201);
 
     const ok = check(res, {
-        'status is 200 or 201': (r) => r.status === 200 || r.status === 201,
+        'status is 201': (r) => r.status === 201,
         'response time < 3s':   (r) => r.timings.duration < 3000,
     });
 
