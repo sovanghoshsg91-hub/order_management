@@ -1,5 +1,6 @@
 server:
   port: 8090
+  max-header-size: 65536
 
 spring:
   application:
@@ -19,7 +20,6 @@ spring:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
-    config-url: /v3/api-docs/swagger-config
     urls:
       - name: partner-service
         url: /partner-service/v3/api-docs
@@ -29,6 +29,10 @@ springdoc:
         url: /fulfilment-service/v3/api-docs
   api-docs:
     enabled: true
+    path: /v3/api-docs
+  cache:
+    disabled: true
+  use-management-port: false
 
 management:
   endpoints:
