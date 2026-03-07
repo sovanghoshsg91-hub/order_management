@@ -36,8 +36,8 @@ springdoc:
         url: /partner-service/v3/api-docs
       - name: order-service
         url: /order-service/v3/api-docs
-      - name: fulfilment-service
-        url: /fulfilment-service/v3/api-docs
+      - name: api-gateway
+        url: /v3/api-docs
     urls-primary-name: partner-service
   api-docs:
     enabled: true

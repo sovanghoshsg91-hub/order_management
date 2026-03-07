@@ -68,11 +68,6 @@ public class GatewayConfig {
                         .filters(f -> f.stripPrefix(1))
                         .uri(orderServiceUrl))
 
-                .route("fulfilment-service-docs", r -> r
-                        .path("/fulfilment-service/v3/api-docs", "/fulfilment-service/v3/api-docs/**")
-                        .filters(f -> f.stripPrefix(1))
-                        .uri(fulfilmentServiceUrl))
-
                 .build();
     }
 }
