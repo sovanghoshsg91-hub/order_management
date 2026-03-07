@@ -49,20 +49,27 @@ public class GatewayConfig {
                                 .filter(rateLimitFilter))
                         .uri(orderServiceUrl))
 
+                .route("fulfilment-service", r -> r
+                        .path("/fulfilments/**")
+                        .filters(f -> f
+                                .filter(correlationIdFilter)
+                                .filter(rateLimitFilter))
+                        .uri(fulfilmentServiceUrl))
+
                 // ── Swagger API docs routes ────────────────────────────────
 
                 .route("partner-service-docs", r -> r
-                        .path("/partner-service/v3/api-docs/**")
+                        .path("/partner-service/v3/api-docs", "/partner-service/v3/api-docs/**")
                         .filters(f -> f.stripPrefix(1))
                         .uri(partnerServiceUrl))
 
                 .route("order-service-docs", r -> r
-                        .path("/order-service/v3/api-docs/**")
+                        .path("/order-service/v3/api-docs", "/order-service/v3/api-docs/**")
                         .filters(f -> f.stripPrefix(1))
                         .uri(orderServiceUrl))
 
                 .route("fulfilment-service-docs", r -> r
-                        .path("/fulfilment-service/v3/api-docs/**")
+                        .path("/fulfilment-service/v3/api-docs", "/fulfilment-service/v3/api-docs/**")
                         .filters(f -> f.stripPrefix(1))
                         .uri(fulfilmentServiceUrl))
 

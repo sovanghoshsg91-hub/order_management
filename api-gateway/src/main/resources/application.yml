@@ -1,6 +1,6 @@
 server:
   port: 8090
-  max-header-size: 65536
+  max-http-request-header-size: 65536
 
 spring:
   application:
@@ -17,6 +17,17 @@ spring:
         jwt:
           jwk-set-uri: ${COGNITO_JWKS_URL}
 
+  cloud:
+    gateway:
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
@@ -27,6 +38,7 @@ springdoc:
         url: /order-service/v3/api-docs
       - name: fulfilment-service
         url: /fulfilment-service/v3/api-docs
+    urls-primary-name: partner-service
   api-docs:
     enabled: true
     path: /v3/api-docs
