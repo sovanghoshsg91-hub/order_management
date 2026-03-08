@@ -37,8 +37,9 @@ public class OrderController {
     public ResponseEntity<?> createOrder(
             @AuthenticationPrincipal Jwt jwt,
             @RequestHeader("Idempotency-Key") String idempotencyKey,
-            @RequestHeader("X-Partner-Id") String partnerId,
             @Valid @RequestBody OrderRequest request) {
+
+        String partnerId = jwt.getClaimAsString("custom:partnerId");
 
         if (partnerId == null || partnerId.isBlank()) {
             log.warn("JWT missing custom:partnerId claim. sub={}",
@@ -66,9 +67,10 @@ public class OrderController {
     @Operation(summary = "List orders with cursor-based pagination")
     public ResponseEntity<?> listOrders(
             @AuthenticationPrincipal Jwt jwt,
-            @RequestHeader("X-Partner-Id") String partnerId,
             @RequestParam(defaultValue = "10") int limit,
             @RequestParam(required = false) String cursor) {
+
+        String partnerId = jwt.getClaimAsString("custom:partnerId");
 
         if (partnerId == null || partnerId.isBlank()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
@@ -90,8 +92,9 @@ public class OrderController {
     @Operation(summary = "Get order by ID")
     public ResponseEntity<?> getOrder(
             @AuthenticationPrincipal Jwt jwt,
-            @RequestHeader("X-Partner-Id") String partnerId,
             @PathVariable String orderId) {
+
+        String partnerId = jwt.getClaimAsString("custom:partnerId");
 
         if (partnerId == null || partnerId.isBlank()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
