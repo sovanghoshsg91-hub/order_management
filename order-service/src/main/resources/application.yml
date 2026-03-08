@@ -24,6 +24,17 @@ spring:
         username="${KAFKA_API_KEY}"
         password="${KAFKA_API_SECRET}";
 
+partner:
+  service:
+    url: http://partner-service.partner-orders.local:8082
+
+feign:
+  client:
+    config:
+      partner-service:
+        connectTimeout: 2000
+        readTimeout: 3000
+
 aws:
   region: ${AWS_REGION:ap-south-1}
 

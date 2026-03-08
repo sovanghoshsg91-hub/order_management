@@ -1,4 +1,4 @@
-package com.platform.partner.model;
+package com.platform.partner.entity;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

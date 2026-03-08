@@ -1,6 +1,6 @@
 package com.platform.partner.service;
 
-import com.platform.partner.model.Partner;
+import com.platform.partner.entity.Partner;
 import com.platform.partner.repository.PartnerRepository;
 import com.platform.shared.audit.AuditEventType;
 import com.platform.shared.audit.AuditService;
