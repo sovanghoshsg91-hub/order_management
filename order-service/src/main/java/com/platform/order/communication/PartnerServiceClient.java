@@ -12,6 +12,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 )
 public interface PartnerServiceClient {
 
-    @GetMapping("/partners/{partnerId}")
-    PartnerResponse getPartner(@PathVariable("partnerId") String partnerId);
+    @GetMapping("/internal/partners/{partnerId}/status")
+    String getPartnerStatus(@PathVariable("partnerId") String partnerId);
 }
