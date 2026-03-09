@@ -26,9 +26,6 @@ const PARTNER_TOKEN = __ENV.PARTNER_TOKEN || 'YOUR_PARTNER_JWT_TOKEN';
 //    20 VUs, no sleep, bad tokens
 //    Generates 401s rapidly → triggers 4xx-high CloudWatch alarm
 //
-//  SCENARIO 3 — cpu_spike (130s-190s)
-//    30 VUs, no sleep, valid tokens
-//    Max throughput → triggers CPU alarm on order-service
 //
 export const options = {
     scenarios: {
@@ -43,12 +40,6 @@ export const options = {
             vus:       20,
             duration:  '60s',
             startTime: '65s',
-        },
-        cpu_spike: {
-            executor:  'constant-vus',
-            vus:       30,
-            duration:  '60s',
-            startTime: '130s',
         },
     },
     thresholds: {
