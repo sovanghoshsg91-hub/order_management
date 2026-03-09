@@ -117,12 +117,6 @@ public class PartnerService {
         return toResponse(partner);
     }
 
-    public String getPartnerStatus(String partnerId) {
-        Partner partner = partnerRepository.findById(partnerId)
-                .orElseThrow(() -> new PartnerNotFoundException(partnerId));
-        return partner.getStatus();
-    }
-
     private PartnerResponse toResponse(Partner partner) {
         return PartnerResponse.builder()
                 .partnerId(partner.getPartnerId())

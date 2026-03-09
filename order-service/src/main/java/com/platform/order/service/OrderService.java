@@ -2,7 +2,6 @@ package com.platform.order.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.platform.order.communication.PartnerServiceClient;
 import com.platform.order.dto.OrderListResponse;
 import com.platform.order.entity.IdempotencyKey;
 import com.platform.order.entity.Order;
@@ -48,8 +47,6 @@ public class OrderService {
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final AuditService auditService;
-
-    private final PartnerServiceClient partnerServiceClient;
     private static final String PARTNER_STATUS_KEY = "partner:%s:status";
 
     public OrderResponse createOrder(String partnerId,
@@ -246,11 +243,11 @@ public class OrderService {
         String status = redisTemplate.opsForValue().get(redisKey);
 
         if (status == null) {
-            String liveStatus = partnerServiceClient.getPartnerStatus(partnerId);
-            redisTemplate.opsForValue().set(redisKey, liveStatus, Duration.ofHours(24));
-            status = liveStatus;
-            log.debug("Cache miss, loaded from partner-service: partnerId={} status={}",
-                    partnerId, status);
+            // Cache miss — allow through, Redis will be populated
+            // when partner-service writes on next revoke
+            log.warn("Partner status cache miss, allowing through: partnerId={}",
+                    partnerId);
+            return;
         }
 
         if ("REVOKED".equals(status)) {

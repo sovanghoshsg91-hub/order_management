@@ -54,16 +54,6 @@ public class PartnerController {
         return ResponseEntity.ok(response);
     }
 
-    // Internal endpoint for service-to-service calls
-    // No @PreAuthorize — any valid JWT can call this
-    @GetMapping("/internal/{partnerId}/status")
-    public ResponseEntity<String> getPartnerStatus(
-            @PathVariable String partnerId) {
-        String status = partnerService.getPartnerStatus(partnerId);
-        return ResponseEntity.ok(status);
-    }
-
-
     @GetMapping("/health")
     @Operation(summary = "Health check")
     public ResponseEntity<String> health() {
