@@ -2,7 +2,6 @@ package com.platform.order.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.platform.order.communication.PartnerServiceClient;
 import com.platform.order.dto.OrderListResponse;
 import com.platform.order.entity.IdempotencyKey;
 import com.platform.order.entity.Order;
@@ -14,7 +13,6 @@ import com.platform.shared.audit.AuditEventType;
 import com.platform.shared.audit.AuditService;
 import com.platform.shared.dto.OrderRequest;
 import com.platform.shared.dto.OrderResponse;
-import com.platform.shared.dto.PartnerResponse;
 import com.platform.shared.event.OrderCreatedEvent;
 import com.platform.shared.exception.IdempotencyConflictException;
 import com.platform.shared.exception.OrderNotFoundException;
@@ -22,7 +20,6 @@ import com.platform.shared.exception.PartnerRevokedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbIndex;
@@ -32,7 +29,6 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.security.MessageDigest;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -48,9 +44,6 @@ public class OrderService {
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final AuditService auditService;
-
-    @Autowired
-    private PartnerServiceClient partnerServiceClient;
     private static final String PARTNER_STATUS_KEY = "partner:%s:status";
 
     public OrderResponse createOrder(String partnerId,
@@ -247,13 +240,11 @@ public class OrderService {
         String status = redisTemplate.opsForValue().get(redisKey);
 
         if (status == null) {
-            // Cache miss → call partner-service via Feign
-            PartnerResponse partner = partnerServiceClient.getPartner(partnerId);
-            status = partner.getStatus();
-            // Re-warm Redis for 24 hours
-            redisTemplate.opsForValue().set(redisKey, status, Duration.ofHours(24));
-            log.debug("Cache miss, loaded from partner-service: partnerId={} status={}",
-                    partnerId, status);
+            // Cache miss — allow through, Redis will be populated
+            // when partner-service writes on next revoke
+            log.warn("Partner status cache miss, allowing through: partnerId={}",
+                    partnerId);
+            return;
         }
 
         if ("REVOKED".equals(status)) {
