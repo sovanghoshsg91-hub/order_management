@@ -56,7 +56,7 @@ public class PartnerController {
 
     // Internal endpoint for service-to-service calls
     // No @PreAuthorize — any valid JWT can call this
-    @GetMapping("/internal/partners/{partnerId}/status")
+    @GetMapping("/internal/{partnerId}/status")
     public ResponseEntity<String> getPartnerStatus(
             @PathVariable String partnerId) {
         String status = partnerService.getPartnerStatus(partnerId);
