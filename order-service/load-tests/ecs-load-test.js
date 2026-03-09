@@ -17,14 +17,11 @@ const PARTNER_TOKEN = __ENV.PARTNER_TOKEN || 'YOUR_PARTNER_JWT_TOKEN';
 // ── Scenarios ───────────────────────────────────────────────────────────────
 //
 //  SCENARIO 1 — rate_limit_demo (0s-30s)
-//    15 VUs, no sleep = ~150 req/s
-//    Rate limit = 10/s per partner → 429s guaranteed every second
-//    Shows: RATE_LIMIT_EXCEEDED in k6 output + orders still succeeding
+//    15 VUs, NO sleep = burst >>10 req/s
+//    Rate limit = 10/s → guaranteed 429s visible in console
 //
 //  SCENARIO 2 — alarm_4xx (35s-95s)
-//    20 VUs, no sleep, bad tokens
-//    Generates 401s rapidly → triggers 4xx-high CloudWatch alarm
-//    Shows: CloudWatch alarm flipping to ALARM state live
+//    20 VUs, no sleep, bad tokens → triggers 4xx-high CloudWatch alarm
 //
 export const options = {
     scenarios: {
@@ -83,11 +80,10 @@ export default function () {
             { headers: badHeaders() }
         );
         check(res, { '401 bad token': (r) => r.status === 401 });
-        // No sleep — maximize 4xx rate
-        return;
+        return; // no sleep — maximize 4xx rate
     }
 
-    // Scenario 1 — valid requests, no sleep → burst > 10/s → triggers 429
+    // Scenario 1 — valid requests, NO sleep → burst exceeds 10/s → 429s
     const res = http.post(
         `${GATEWAY_URL}/orders`,
         makeOrder(),
@@ -101,34 +97,28 @@ export default function () {
         ordersCreated.add(1);
         try {
             const body = JSON.parse(res.body);
-            console.log(`✅ CREATED orderId=${body.orderId} vu=${__VU} time=${res.timings.duration}ms`);
+            console.log(`OK [201] orderId=${body.orderId} vu=${__VU} time=${res.timings.duration}ms`);
         } catch (e) {
-            console.log(`✅ CREATED vu=${__VU} time=${res.timings.duration}ms`);
+            console.log(`OK [201] vu=${__VU} time=${res.timings.duration}ms`);
         }
     }
 
     if (res.status === 429) {
         rateLimited.add(1);
-        try {
-            const body = JSON.parse(res.body);
-            console.log(`⚡ 429 ${body.errorCode} vu=${__VU} — ${body.message}`);
-        } catch (e) {
-            console.log(`⚡ 429 RATE_LIMIT_EXCEEDED vu=${__VU}`);
-        }
+        // Print exactly like the FAIL format so it's visible in console
+        console.log(`FAIL [${res.status}] ${res.body.substring(0, 200)}`);
+        sleep(0.1); // brief back-off after rate limit — realistic behaviour
     }
 
     if (res.status >= 500) {
         serverErrors.add(1);
-        console.log(`❌ ERROR [${res.status}] vu=${__VU} body=${res.body.substring(0, 150)}`);
+        console.log(`FAIL [${res.status}] ${res.body.substring(0, 200)}`);
     }
 
     check(res, {
-        '201 or 429 (expected)': (r) => r.status === 201 || r.status === 429,
-        'not 5xx':               (r) => r.status < 500,
+        '201 or 429 only': (r) => r.status === 201 || r.status === 429,
+        'not 5xx':         (r) => r.status < 500,
     });
-
-    // Small sleep after 429 to avoid hammering — realistic client behaviour
-    if (res.status === 429) sleep(0.1);
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
@@ -152,15 +142,9 @@ export function handleSummary(data) {
     console.log(`║  p95 Response    : ${String(p95 + 'ms').padEnd(21)}║`);
     console.log('╠══════════════════════════════════════════╣');
     console.log('║  DEMO CHECKLIST:                         ║');
-    console.log('║  ✅ 429 RATE_LIMIT_EXCEEDED in output    ║');
+    console.log('║  ✅ FAIL [429] in console output above   ║');
     console.log('║  ✅ CloudWatch → 4xx-high = ALARM 🔴     ║');
     console.log('║  ✅ ECS → order-service → 2 tasks        ║');
-    console.log('╠══════════════════════════════════════════╣');
-    console.log('║  LOAD BALANCE PROOF (CloudWatch Logs):   ║');
-    console.log('║  fields @timestamp, message              ║');
-    console.log('║  | filter message like /Creating order/  ║');
-    console.log('║  | stats count(*) by @logStream          ║');
-    console.log('║  → 2 streams with counts = balanced ✅   ║');
     console.log('╚══════════════════════════════════════════╝\n');
 
     return { 'load-test-summary.json': JSON.stringify(data, null, 2) };
