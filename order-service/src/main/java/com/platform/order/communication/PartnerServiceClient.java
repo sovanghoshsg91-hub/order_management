@@ -5,7 +5,6 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-// order-service
 @FeignClient(
         name = "partner-service",
         url = "${partner.service.url:http://partner-service.partner-orders.local:8081}"

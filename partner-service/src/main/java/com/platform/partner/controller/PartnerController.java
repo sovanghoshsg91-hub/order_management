@@ -63,6 +63,7 @@ public class PartnerController {
         return ResponseEntity.ok(status);
     }
 
+
     @GetMapping("/health")
     @Operation(summary = "Health check")
     public ResponseEntity<String> health() {
