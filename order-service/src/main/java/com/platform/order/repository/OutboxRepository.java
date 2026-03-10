@@ -6,8 +6,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
 import software.amazon.awssdk.enhanced.dynamodb.*;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
+import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -16,6 +21,7 @@ import java.util.stream.Collectors;
 public class OutboxRepository {
 
     private final DynamoDbEnhancedClient dynamoDbEnhancedClient;
+    private final DynamoDbClient dynamoDbClient;
 
     private DynamoDbTable<OutboxEvent> table() {
         return dynamoDbEnhancedClient.table("OutboxEvents",
@@ -46,5 +52,33 @@ public class OutboxRepository {
                 .stream()
                 .flatMap(page -> page.items().stream())
                 .collect(Collectors.toList());
+    }
+
+    public boolean claimEvent(String eventId) {
+        try {
+            Map<String, AttributeValue> key = Map.of(
+                    "eventId", AttributeValue.builder().s(eventId).build()
+            );
+
+            Map<String, AttributeValue> expressionValues = Map.of(
+                    ":pending",    AttributeValue.builder().s("PENDING").build(),
+                    ":processing", AttributeValue.builder().s("PROCESSING").build()
+            );
+
+            UpdateItemRequest request = UpdateItemRequest.builder()
+                    .tableName("OutboxEvents")
+                    .key(key)
+                    .updateExpression("SET #status = :processing")
+                    .conditionExpression("#status = :pending")  // ← atomic check
+                    .expressionAttributeNames(Map.of("#status", "status"))
+                    .expressionAttributeValues(expressionValues)
+                    .build();
+
+            dynamoDbClient.updateItem(request);
+            return true; // claimed successfully
+
+        } catch (ConditionalCheckFailedException e) {
+            return false; // another instance already claimed it
+        }
     }
 }

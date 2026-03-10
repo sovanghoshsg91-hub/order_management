@@ -32,6 +32,11 @@ public class OutboxPoller {
                 pendingEvents.size());
 
         for (OutboxEvent event : pendingEvents) {
+            boolean claimed = outboxRepository.claimEvent(event.getEventId());
+            if (!claimed) {
+                log.info("Event already claimed by another instance, skipping: {}", event.getEventId());
+                continue;
+            }
             try {
                 kafkaTemplate.send(event.getEventType(),
                                 event.getPayload())
