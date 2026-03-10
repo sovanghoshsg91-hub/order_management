@@ -17,11 +17,4 @@ public class PartnerRequest {
     @NotBlank(message = "Partner name is required")
     private String name;
 
-    @NotNull(message = "Rate limit is required")
-    @Min(value = 1, message = "Rate limit must be at least 1")
-    private Integer rateLimit;
-
-    @NotNull(message = "Daily quota is required")
-    @Min(value = 1, message = "Daily quota must be at least 1")
-    private Integer dailyQuota;
 }

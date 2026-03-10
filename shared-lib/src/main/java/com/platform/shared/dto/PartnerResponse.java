@@ -16,7 +16,7 @@ public class PartnerResponse {
     private String partnerId;
     private String name;
     private String status;
-    private Integer rateLimit;
-    private Integer dailyQuota;
     private Instant createdAt;
+
+    private Instant updatedAt;
 }

@@ -41,8 +41,6 @@ public class PartnerService {
                 .partnerId(partnerId)
                 .name(request.getName())
                 .status("ACTIVE")
-                .rateLimit(request.getRateLimit())
-                .dailyQuota(request.getDailyQuota())
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
@@ -122,9 +120,8 @@ public class PartnerService {
                 .partnerId(partner.getPartnerId())
                 .name(partner.getName())
                 .status(partner.getStatus())
-                .rateLimit(partner.getRateLimit())
-                .dailyQuota(partner.getDailyQuota())
                 .createdAt(partner.getCreatedAt())
+                .updatedAt(partner.getUpdatedAt())
                 .build();
     }
 }

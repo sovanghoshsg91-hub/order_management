@@ -19,8 +19,6 @@ public class Partner {
     private String partnerId;
     private String name;
     private String status;       // ACTIVE or REVOKED
-    private Integer rateLimit;   // requests per second
-    private Integer dailyQuota;  // requests per day
     private Instant createdAt;
     private Instant updatedAt;
 
