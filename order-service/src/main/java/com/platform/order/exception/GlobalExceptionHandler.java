@@ -24,7 +24,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(PartnerRevokedException.class)
     public ResponseEntity<ErrorResponse> handlePartnerRevoked(
             PartnerRevokedException ex) {
-        log.warn("Partner revoked access attempt: {}", ex.getPartnerId());
+
+        log.warn("Partner access has been revoked: {} correlationId={}",
+                ex.getMessage(), MDC.get("correlationId"));
+
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
                 ErrorResponse.builder()
                         .errorCode("PARTNER_REVOKED")
@@ -37,7 +40,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IdempotencyConflictException.class)
     public ResponseEntity<ErrorResponse> handleIdempotencyConflict(
             IdempotencyConflictException ex) {
-        log.warn("Idempotency conflict: {}", ex.getIdempotencyKey());
+
+        log.warn("Idempotency key reused with different payload: {} correlationId={}",
+                ex.getMessage(), MDC.get("correlationId"));
+
         return ResponseEntity.status(HttpStatus.CONFLICT).body(
                 ErrorResponse.builder()
                         .errorCode("IDEMPOTENCY_CONFLICT")
@@ -66,6 +72,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingRequestHeaderException.class)
     public ResponseEntity<ErrorResponse> handleMissingHeader(
             MissingRequestHeaderException ex) {
+
+        log.warn("Required header missing: {} correlationId={}",
+                ex.getMessage(), MDC.get("correlationId"));
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
                 ErrorResponse.builder()
                         .errorCode("MISSING_HEADER")
@@ -83,6 +93,10 @@ public class GlobalExceptionHandler {
             String field = ((FieldError) error).getField();
             details.put(field, error.getDefaultMessage());
         });
+
+        log.warn("Request validation failed: {} correlationId={}",
+                ex.getMessage(), MDC.get("correlationId"));
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
                 ErrorResponse.builder()
                         .errorCode("VALIDATION_ERROR")
@@ -95,7 +109,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
-        log.error("Unexpected error", ex);
+
+        log.warn("An unexpected error occurred: {} correlationId={}",
+                ex.getMessage(), MDC.get("correlationId"));
+        
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                 ErrorResponse.builder()
                         .errorCode("INTERNAL_ERROR")
