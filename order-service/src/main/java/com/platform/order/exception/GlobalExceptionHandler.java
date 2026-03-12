@@ -50,6 +50,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(OrderNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleOrderNotFound(
             OrderNotFoundException ex) {
+
+        log.warn("Order not found: {} correlationId={}",
+                ex.getMessage(), MDC.get("correlationId"));
+
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
                 ErrorResponse.builder()
                         .errorCode("ORDER_NOT_FOUND")
